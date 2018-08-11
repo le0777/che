@@ -13,13 +13,13 @@ package org.eclipse.che.plugin.languageserver.ide;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import com.google.web.bindery.event.shared.EventBus;
 import java.util.Set;
-import org.eclipse.che.api.languageserver.shared.model.LanguageRegex;
 import org.eclipse.che.ide.api.editor.EditorRegistry;
 import org.eclipse.che.ide.api.filetypes.FileType;
-import org.eclipse.che.ide.api.filetypes.FileTypeRegistry;
-import org.eclipse.che.ide.api.filetypes.FileTypeRegistry.Collision;
-import org.eclipse.che.ide.api.filetypes.FileTypeRegistry.Registration;
+import org.eclipse.che.ide.api.filetypes.FileTypeRegistry.FileTypeProvider;
+import org.eclipse.che.ide.api.workspace.event.WorkspaceStoppedEvent;
+import org.eclipse.che.ide.api.workspace.event.WsAgentServerStoppedEvent;
 import org.eclipse.che.plugin.languageserver.ide.editor.LanguageServerEditorProvider;
 import org.eclipse.che.plugin.languageserver.ide.registry.LanguageServerRegistry;
 import org.eclipse.che.plugin.languageserver.ide.service.LanguageServerServiceClient;
@@ -35,22 +35,26 @@ public class LanguageRegexesInitializer {
   private final EditorRegistry editorRegistry;
   private final LanguageServerEditorProvider editorProvider;
   private final LanguageServerServiceClient languageServerServiceClient;
-  private final FileTypeRegistry fileTypeRegistry;
+  private final FileTypeProvider fileTypeProvider;
 
   @Inject
   public LanguageRegexesInitializer(
+      EventBus eventBus,
       LanguageServerRegistry lsRegistry,
       LanguageServerResources resources,
       EditorRegistry editorRegistry,
       LanguageServerEditorProvider editorProvider,
       LanguageServerServiceClient languageServerServiceClient,
-      FileTypeRegistry fileTypeRegistry) {
+      FileTypeProvider fileTypeProvider) {
     this.lsRegistry = lsRegistry;
     this.resources = resources;
     this.editorRegistry = editorRegistry;
     this.editorProvider = editorProvider;
     this.languageServerServiceClient = languageServerServiceClient;
-    this.fileTypeRegistry = fileTypeRegistry;
+    this.fileTypeProvider = fileTypeProvider;
+
+    eventBus.addHandler(WorkspaceStoppedEvent.TYPE, e -> unInstall());
+    eventBus.addHandler(WsAgentServerStoppedEvent.TYPE, e -> unInstall());
   }
 
   void initialize() {
@@ -60,9 +64,14 @@ public class LanguageRegexesInitializer {
             languageRegexes -> {
               languageRegexes.forEach(
                   languageRegex -> {
-                    FileType fileTypeCandidate =
-                        new FileType(resources.file(), null, languageRegex.getNamePattern());
-                    registerFileType(fileTypeCandidate, languageRegex);
+                    Set<FileType> fileTypes =
+                        fileTypeProvider.getByNamePattern(
+                            resources.file(), languageRegex.getNamePattern());
+                    fileTypes.forEach(
+                        fileType -> {
+                          lsRegistry.registerFileType(fileType, languageRegex);
+                          editorRegistry.registerDefaultEditor(fileType, editorProvider);
+                        });
                   });
             })
         .catchError(
@@ -71,24 +80,13 @@ public class LanguageRegexesInitializer {
             });
   }
 
-  private void registerFileType(FileType fileTypeCandidate, LanguageRegex languageRegex) {
-    Registration registration = fileTypeRegistry.register(fileTypeCandidate);
-    if (registration.isSuccessful()) {
-      lsRegistry.registerFileType(fileTypeCandidate, languageRegex);
-      editorRegistry.registerDefaultEditor(fileTypeCandidate, editorProvider);
-      return;
-    }
-
-    Collision collision = registration.getCollision();
-    if (collision.canBeSafelyMerged()) {
-      Set<FileType> mergedTypes = collision.merge();
-      mergedTypes.forEach(
-          fileType -> {
-            lsRegistry.registerFileType(fileType, languageRegex);
-            editorRegistry.registerDefaultEditor(fileType, editorProvider);
-          });
-    } else {
-      LOGGER.error("Can not register file type with extension " + fileTypeCandidate.getExtension());
-    }
+  private void unInstall() {
+    lsRegistry
+        .getRegisteredFileTypes()
+        .forEach(
+            fileType -> {
+              lsRegistry.unRegister(fileType);
+              editorRegistry.unRegister(fileType, editorProvider);
+            });
   }
 }

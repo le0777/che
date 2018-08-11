@@ -45,7 +45,7 @@ public class FileType {
     this.image = image;
     this.extension = extension;
     this.namePatterns = new HashSet<>();
-    setNamePattern(namePattern);
+    addNamePattern(namePattern);
   }
 
   /** Returns the image resource associated with file */
@@ -83,20 +83,29 @@ public class FileType {
     this.extension = extension;
   }
 
-  /** Adds name pattern describing the file type */
+  /**
+   * Adds name pattern describing the file type
+   *
+   * @deprecated FileType can contain a few name patterns, so use {@link #addNamePattern(String)}
+   *     instead
+   */
   public void setNamePattern(String namePattern) {
-    if (!isNullOrEmpty(namePattern)) {
-      namePatterns.add(namePattern);
-    }
+    addNamePattern(namePattern);
   }
 
-  /** Adds name patterns set describing the file type */
-  public void addNamePatterns(Set<String> patterns) {
-    if (patterns == null) {
-      return;
+  /**
+   * Adds name pattern describing the file type
+   *
+   * @param namePattern pattern for adding
+   * @return {@code true} if the pattern was added and {@code false} if given pattern is illegal
+   *     ({@code null} or empty) either if it is already present
+   */
+  public boolean addNamePattern(String namePattern) {
+    if (isNullOrEmpty(namePattern)) {
+      return false;
     }
 
-    patterns.forEach(this::setNamePattern);
+    return namePatterns.add(namePattern);
   }
 
   @Override

@@ -28,50 +28,34 @@ import org.eclipse.che.ide.api.filetypes.FileTypeRegistry;
 import org.eclipse.che.ide.api.resources.VirtualFile;
 
 /**
- * Implementation of {@link org.eclipse.che.ide.api.filetypes.FileTypeRegistry}
+ * Implementation of {@link FileTypeRegistry}
  *
  * @author Artem Zatsarynnyi
  */
 @Singleton
 public class FileTypeRegistryImpl implements FileTypeRegistry {
   private final FileType unknownFileType;
-  private final FileTypeCollisionChecker collisionChecker;
   private final Set<FileType> fileTypes = new HashSet<>();
 
   @Inject
-  public FileTypeRegistryImpl(
-      @Named("defaultFileType") FileType unknownFileType,
-      FileTypeCollisionChecker collisionChecker) {
+  public FileTypeRegistryImpl(@Named("defaultFileType") FileType unknownFileType) {
     this.unknownFileType = unknownFileType;
-    this.collisionChecker = collisionChecker;
-  }
-
-  @Override
-  public Registration register(FileType candidate) {
-    Collision collision = collisionChecker.check(candidate, getFileTypes());
-    if (collision != null) {
-      return new FileTypeRegistration(collision);
-    }
-
-    fileTypes.add(candidate);
-    return new FileTypeRegistration();
   }
 
   @Override
   public void registerFileType(FileType candidate) {
-    Registration registration = register(candidate);
-    if (registration.isSuccessful()) {
-      return;
+    if (candidate == null) {
+      throw new IllegalArgumentException("Can not register Illegal File Type");
     }
 
-    Collision collision = registration.getCollision();
-    if (collision.canBeSafelyMerged()) {
-      collision.merge();
-      return;
+    String extension = candidate.getExtension();
+    FileType duplicate = getFileTypeByExtension(extension);
+    if (duplicate != unknownFileType && !duplicate.equals(candidate)) {
+      throw new IllegalStateException(
+          "File Type with extension " + extension + " is already registered");
     }
 
-    throw new IllegalStateException(
-        "Can not register file type with extension " + candidate.getExtension());
+    fileTypes.add(candidate);
   }
 
   @Override

@@ -20,6 +20,7 @@ import com.google.inject.name.Named;
 import org.eclipse.che.api.languageserver.shared.model.LanguageDescription;
 import org.eclipse.che.ide.api.extension.ExtensionGinModule;
 import org.eclipse.che.ide.api.filetypes.FileType;
+import org.eclipse.che.ide.api.filetypes.FileTypeRegistry.FileTypeProvider;
 import org.eclipse.che.ide.api.project.type.wizard.ProjectWizardRegistrar;
 import org.eclipse.che.plugin.web.client.CamelLanguageDescriptionProvider;
 import org.eclipse.che.plugin.web.client.JsonLanguageDescriptionProvider;
@@ -105,7 +106,7 @@ public class WebModule extends AbstractGinModule {
   @Provides
   @Singleton
   @Named("PHPFileType")
-  protected FileType providePHPFile(WebExtensionResource res) {
-    return new FileType(res.phpFile(), "php");
+  protected FileType providePHPFile(WebExtensionResource res, FileTypeProvider fileTypeProvider) {
+    return fileTypeProvider.getByExtension(res.phpFile(), "php");
   }
 }
