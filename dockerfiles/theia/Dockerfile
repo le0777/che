@@ -8,7 +8,7 @@
 # Contributors:
 #   Red Hat, Inc. - initial API and implementation
 
-FROM node:9-alpine
+FROM centos
 
 ARG GITHUB_TOKEN
 ARG THEIA_VERSION=0.3.13
@@ -27,4 +27,3 @@ ADD supervisord.conf /etc/
 RUN ${HOME}/setup.sh
 
 ENTRYPOINT ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
-RUN apk update && apk add openjdk8
